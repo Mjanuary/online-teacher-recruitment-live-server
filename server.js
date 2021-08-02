@@ -207,11 +207,11 @@ let ROOM_DETAILS = [
   },
 ];
 
-app.get("/api/room-members/:roomId", (req, res) => {
+app.get("/liveserver/api/room-members/:roomId", (req, res) => {
   res.send(CANDIDATES.filter((itm) => itm.room_id === req.params.roomId));
 });
 
-app.post("/api/login", (req, res) => {
+app.post("/liveserver/api/login", (req, res) => {
   // res.send(CANDIDATES.filter((itm) => itm.room_id === req.params.roomId));
   // console.log("LOGIN: " + req.body.email);
   const email = req.body.email;
