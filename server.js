@@ -12,7 +12,7 @@ app.use(cors());
 const server = require("http").Server(app);
 const io = require("socket.io")(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "http://165.22.77.142",
     methods: ["GET", "POST"],
   },
 });
