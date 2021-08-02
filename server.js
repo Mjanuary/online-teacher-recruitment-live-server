@@ -4,8 +4,8 @@ const bodyParser = require("body-parser");
 
 const app = express();
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(exp.json());
 
 app.use(cors());
 
@@ -55,8 +55,9 @@ let Events = {
 };
 
 const { v4: uuidV4 } = require("uuid");
+const exp = require("constants");
 
-app.get("/", (req, res) => {
+app.get("/liveserver", (req, res) => {
   console.log("visited");
   res.send({ msg: "Welcome to the live server" });
 });
