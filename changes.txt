@@ -1,0 +1,3 @@
+// this list the event that do the similar stuffs but that are replaced by the new functionality
+UPDATED_ROOM_LIST ==> GET_ROOM_INFO_SERVER;
+JOIN_ROOM_CANDIDATE_SERVER ==> "join-room"

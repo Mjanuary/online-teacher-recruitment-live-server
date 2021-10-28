@@ -1,10 +1,13 @@
 const express = require("express");
-var cors = require("cors");
-const bodyParser = require("body-parser");
+const cors = require("cors");
+const Events = require("./src/events");
+const logger = require("./src/logger");
+const Redis = require("redis");
+const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
+const { createCandidate, createNewRoom } = require("./src/functions");
 
-// Configuration
-const SERVER_URL = "http://157.245.142.149";
-const SERVER_PORT = 5000;
+// const client = Redis.createClient({url: ""})
+const redisClient = Redis.createClient();
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
@@ -19,241 +22,458 @@ const io = require("socket.io")(server, {
   },
 });
 
-let Events = {
-  START_EXAM_CLIENT: "START_EXAM_CLIENT",
-  START_EXAM_SERVER: "START_EXAM_SERVER",
+/**
+ * Update the candidate details
+ * @param {*} room_id
+ * @param {*} data
+ */
+const updateCandidateDetails = (room_id, data) => {
+  redisClient.get(room_id, (error, room) => {
+    if (error) logger.error(error);
 
-  STOP_EXAM_CLIENT: "STOP_EXAM_CLIENT",
-  STOP_EXAM_SERVER: "STOP_EXAM_SERVER",
+    if (room !== null) {
+      let newRoom = { ...JSON.parse(room) };
+      let updatedCandidates = newRoom.candidates.map((candid) =>
+        candid.user_id === data.user_id ? { ...candid, ...data } : candid
+      );
+      newRoom.candidates = updatedCandidates;
 
-  CAND_EVENT_CLIENT: "CAND_EVENT_CLIENT",
-  CAND_EVENT_SERVER: "CAND_EVENT_SERVER",
-
-  CAND_CONTINUE_EXAM_SERVER: "CAND_CONTINUE_EXAM_SERVER",
-  CAND_CONTINUE_EXAM_CLIENT: "CAND_CONTINUE_EXAM_CLIENT",
-
-  CAND_STOP_EXAM_CLIENT: "CAND_STOP_EXAM_CLIENT",
-  CAND_STOP_EXAM_SERVER: "CAND_STOP_EXAM_SERVER",
-
-  CAND_RESTART_EXAM_CLIENT: "CAND_RESTART_EXAM_CLIENT",
-  CAND_RESTART_EXAM_SERVER: "CAND_RESTART_EXAM_SERVER",
-
-  ALL_CAND_RESTART_EXAM_CLIENT: "ALL_CAND_RESTART_EXAM_CLIENT",
-  ALL_CAND_RESTART_EXAM_SERVER: "ALL_CAND_RESTART_EXAM_SERVER",
-
-  CAND_WARNING_EXAM_CLIENT: "CAND_WARNING_EXAM_CLIENT",
-  CAND_WARNING_EXAM_SERVER: "CAND_WARNING_EXAM_SERVER",
-
-  CAND_BRODCAST_MSG_CLIENT: "CAND_BRODCAST_MSG_CLIENT",
-  CAND_BRODCAST_MSG_SERVER: "CAND_BRODCAST_MSG_SERVER",
-
-  CAND_PRIVATE_MSG_CLIENT: "CAND_PRIVATE_MSG_CLIENT",
-  CAND_PRIVATE_MSG_SERVER: "CAND_PRIVATE_MSG_SERVER",
-
-  CAND_EXAM_EVENT_CLIENT: "CAND_EXAM_EVENT_CLIENT",
-  CAND_EXAM_EVENT_SERVER: "CAND_EXAM_EVENT_SERVER",
-
-  UPDATED_ROOM_LIST: "UPDATED_ROOM_LIST",
-
-  CAND_REMOVE_EXAM_CLIENT: "CAND_REMOVE_EXAM_CLIENT",
-  CAND_REMOVE_EXAM_SERVER: "CAND_REMOVE_EXAM_SERVER",
+      // Update room
+      redisClient.setex(room_id, DEFAULT_EXPIRATION, JSON.stringify(newRoom));
+    } else {
+      logger.info("updateCandidateDetails: No room found!");
+    }
+  });
 };
 
-app.get("/liveserver", (req, res) => {
-  // // console.log("visited");
+/**
+ * Update the data on the room only
+ * @param {*} room_id
+ * @param {*} data
+ */
+const updateRoomOptions = (room_id, data) => {
+  redisClient.get(room_id, (error, room) => {
+    if (error) logger.error(error);
+
+    if (room !== null) {
+      let newRoom = { ...JSON.parse(room), ...data };
+      // Update room
+      redisClient.setex(room_id, DEFAULT_EXPIRATION, JSON.stringify(newRoom));
+    } else {
+      logger.info("updateRoomOptions: No room found!");
+    }
+  });
+};
+
+// Redis errors
+redisClient.on("error", (error) => logger.error(error));
+
+app.get("/live-server", (req, res) => {
+  // redisClient.setex("photos", DEFAULT_EXPIRATION, JSON.stringify("data"));
+  // logger.info("visited");
   res.send({ msg: "Welcome to the live server" });
 });
 
-// let CANDIDATES = [];
-
-let CANDIDATES = [
-  // {
-  //   user_id: "",
-  //   room_id: "",
-  //   peer_id: null,
-  // },
-];
-
-let ROOM_DETAILS = [
-  // {
-  //   room_id: ",
-  //   start_exam: false,
-  //   start_time: "",
-  // },
-];
-
 io.on("connection", (socket) => {
-  // console.log("connecting.."); //TODO: to be removed
-  // console.log("active: ", CANDIDATES.length); //TODO: to be removed
+  logger.info("connecting..");
 
-  //******** GET UPDATED ROOM DETAILS ********/
-  socket.on(Events.UPDATED_ROOM_LIST, (room_id, SendRooms) => {
-    // console.log("Sending updated list..."); //TODO: to be removed
-    if (room_id !== undefined && room_id !== null) {
-      // check if the room exists
-      let exists_room = ROOM_DETAILS.find(
-        (room_details) => room_details.room_id === room_id
-      );
+  /**
+   * @action //*JOIN_ROOM_CANDIDATE_SERVER
+   * @description This will add the candidate to the room once they are on the attendance
+   */
+  socket.on("join-room", (data, callBack) => {
+    const { user_id, room_id, supper } = data;
 
-      if (exists_room === undefined) {
-        //* Create a new room
-        ROOM_DETAILS.push({
-          room_id: room_id,
-          start_exam: false,
-          start_time: null,
+    // Add the supervisor to the room
+    if (supper !== undefined && supper === true) {
+      logger.info("SUPERVISOR JOINED THE ROOM");
+
+      socket.join(room_id);
+      return callBack({
+        error: false,
+        msg: "Joined the room",
+        data: { user_id, room_id, supper },
+      });
+    }
+
+    // 1 check if the room exists
+    redisClient.get(room_id, (error, room) => {
+      if (error) {
+        // Handle error
+        return callBack({
+          error: true,
+          msg: "Failed to get connect to room",
+          data: null,
         });
       }
 
-      SendRooms({
-        candidates: CANDIDATES.filter((itm) => itm.room_id === room_id),
-        room:
-          exists_room === undefined
-            ? {
-                room_id: room_id,
-                start_exam: false,
-                start_time: null,
-              }
-            : exists_room,
-      });
-    }
-  });
-
-  //**** user Joined the room */
-  socket.on("join-room", (data, getTheRoom) => {
-    // console.log(" ---------- connected: " + data.user_id + " ---> ");
-
-    //* add users to the database
-    CANDIDATES.push(data);
-
-    //* join the room
-    socket.join(data.room_id);
-
-    // check if the room exist and add it if it doesn't
-    let exists_room = ROOM_DETAILS.find(
-      (room_details) => room_details.room_id === data.room_id
-    );
-    let UsersInRoom = CANDIDATES.filter(
-      (room) => room.room_id === data.room_id
-    );
-
-    if (exists_room === undefined) {
-      //* Create a new room
-      ROOM_DETAILS.push({
-        room_id: data.room_id,
-        start_exam: false,
-        start_time: null,
-      });
-      // console.log("ROOM CREATED: ", data.room_id); //TODO: to be removed
-    } else {
-      // Let others users know
-      socket.to(data.room_id).emit("user-connected", data);
-      console.table(UsersInRoom); //TODO: to be removed
-    }
-
-    //* Send the room info
-    if (getTheRoom !== undefined) {
-      getTheRoom({
-        candidates: UsersInRoom,
-        room: ROOM_DETAILS.find(
-          (room_details) => room_details.room_id === data.room_id
-        ),
-      });
-    }
-
-    //******** START EXAM ********/
-    socket.on(Events.START_EXAM_SERVER, (event) => {
-      // console.log("START EXAM: ", event.room_id); //TODO: to be removed
-      if (event.room_id) {
-        socket.to(event.room_id).emit(Events.START_EXAM_CLIENT, event);
-
-        //* Update db
-        ROOM_DETAILS = ROOM_DETAILS.map((itm) =>
-          itm.room_id === event.room_id
-            ? {
-                ...itm,
-                start_exam: true,
-                start_time: new Date().toDateString(),
-              }
-            : itm
+      // 2 check if the user is on the list
+      if (room !== null) {
+        let RoomData = JSON.parse(room); // get room
+        // check if the user exist on the room
+        let userIsOnList = RoomData.candidates.find(
+          (candid) => candid.user_id === user_id
         );
+
+        if (userIsOnList === undefined) {
+          return callBack({
+            error: true,
+            msg: `You are not on the attendance of Group: ${RoomData.group_id}`,
+            data: null,
+          });
+        } else {
+          //* User is on the list
+          // 1 Join user to socket (Room)
+          socket.join(room_id);
+
+          // 2 Send the JOIN event to the room
+          socket.to(room_id).emit(Events.NEW_USER_JOINED_CLIENT, {
+            ...userIsOnList,
+            joined: true,
+          });
+          logger.info(`${user_id} Joined the room: ${room_id}`);
+
+          // 3 activate the candidate on the list
+          updateCandidateDetails(room_id, {
+            user_id: user_id,
+            active: true,
+            joined: true,
+          });
+
+          // Return the data with the callback
+          return callBack({
+            error: false,
+            msg: "You joined the room successfully!",
+            data: {
+              ...RoomData,
+              user: { ...userIsOnList, active: true, joined: true },
+            },
+          });
+        }
+      } else {
+        logger.info(`Room is not yet started!`);
+        return callBack({
+          error: true,
+          msg: "Room is not yet started!",
+          data: null,
+        });
       }
     });
 
-    //******** STOP EXAM ********/
-    socket.on(Events.STOP_EXAM_SERVER, (event) => {
-      if (event.room_id) {
-        // console.log("==== STOP EXAM ===="); //TODO: to be removed
-        socket.to(event.room_id).emit(Events.STOP_EXAM_CLIENT, event);
-
-        ROOM_DETAILS = ROOM_DETAILS.map((itm) =>
-          itm.room_id === event.room_id
-            ? {
-                ...itm,
-                start_exam: false,
-              }
-            : itm
-        );
-      }
-    });
-
+    // Disconnect
     //**** user disconnected */
     socket.on("disconnect", () => {
       socket.to(data.room_id).emit("user-disconnected", data.user_id);
       socket.leave(data.room_id);
 
-      // remove user to the room
-      CANDIDATES = CANDIDATES.filter((itm) => itm.user_id !== data.user_id);
+      console.log("Disconnected user");
 
-      // console.log("disconnected: " + data.user_id); //TODO: to be removed
-      console.table(CANDIDATES); //TODO: to be removed
+      updateCandidateDetails(data.room_id, {
+        user_id: data.user_id,
+        active: false,
+        stopped: true,
+      });
     });
+  });
 
-    //******** CAND_WARNING_EXAM_SERVER EXAM ********/
-    socket.on(Events.CAND_WARNING_EXAM_SERVER, (event) => {
-      socket.to(event.room_id).emit(Events.CAND_WARNING_EXAM_CLIENT, event);
-    });
+  /**
+   * @action //*JOIN_ROOM_SUPERVISOR_SERVER
+   * @description This will join a supervisor and add them to the list automatically once they are not on the list
+   */
+  socket.on(Events.JOIN_ROOM_SUPERVISOR_SERVER, (user_data, callBack) => {
+    const { user_id, room_id } = user_data;
 
-    //******** CAND_EXAM_EVENT_SERVER EXAM ********/
-    socket.on(Events.CAND_EXAM_EVENT_SERVER, (event) => {
-      if (event.room_id) {
-        socket.to(event.room_id).emit(Events.CAND_EXAM_EVENT_CLIENT, event);
+    // 1 check if the room exists
+    redisClient.get(room_id, (error, room) => {
+      if (error) {
+        // Handle error
+        logger.error(error);
+
+        logger.info("Failed to get connect to room");
+        return callBack({
+          error: true,
+          msg: "Failed to get connect to room",
+          data: null,
+        });
       }
-    });
 
-    //******** CAND_CONTINUE_EXAM_SERVER EXAM ********/
-    socket.on(Events.CAND_CONTINUE_EXAM_SERVER, (event) => {
-      if (event.room_id) {
-        socket.to(event.room_id).emit(Events.CAND_CONTINUE_EXAM_CLIENT, event);
-      }
-    });
+      // 2 check if the user is on the list
+      if (room !== null) {
+        let RoomData = JSON.parse(room); // get room
 
-    //******** CAND_STOP_EXAM_SERVER EXAM ********/
-    socket.on(Events.CAND_STOP_EXAM_SERVER, (event) => {
-      if (event.room_id) {
-        socket.to(event.room_id).emit(Events.CAND_STOP_EXAM_CLIENT, event);
-      }
-    });
+        // 1 Join user to socket (Room)
+        //// socket.join(room_id);
 
-    //******** CAND_STOP_EXAM_SERVER EXAM ********/
-    socket.on(Events.CAND_REMOVE_EXAM_SERVER, (event) => {
-      if (event.room_id) {
-        socket.to(event.room_id).emit(Events.CAND_REMOVE_EXAM_CLIENT, event);
-        // console.log("CANDIDATE REMOVED INTO EXAM");
-      }
-    });
+        // 2 Send the JOIN event to the room
+        socket.to(room_id).emit(Events.NEW_USER_JOINED_CLIENT, userIsOnList);
 
-    // //******** CAND_WARNING_EXAM_SERVER EXAM ********/
-    socket.on(Events.CAND_RESTART_EXAM_SERVER, (event) => {
-      if (event.room_id) {
-        socket.to(event.room_id).emit(Events.CAND_RESTART_EXAM_CLIENT, event);
+        // check if the user exist on the room
+        let userIsOnList = RoomData.candidates.find(
+          (candid) => candid.user_id === user_id
+        );
+
+        let newRoom = null;
+        if (userIsOnList === undefined) {
+          // Add user to the room
+          newRoom = {
+            ...RoomData,
+            candidates: [
+              ...RoomData.candidates,
+              createCandidate(user_id, room_id, "", true),
+            ],
+          };
+          //* Add new user to the database
+          redisClient.setex(
+            room_id,
+            DEFAULT_EXPIRATION,
+            JSON.stringify(newRoom)
+          );
+
+          userIsOnList = createCandidate(user_id, room_id, "", true);
+        } else {
+          newRoom = RoomData;
+        }
+
+        logger.info("You joined the room successfully!");
+        return callBack({
+          error: false,
+          msg: "You joined the room successfully!",
+          data: {
+            ...newRoom,
+            user: userIsOnList,
+          },
+        });
+      } else {
+        logger.info("Room is not yet started!");
+        return callBack({
+          error: true,
+          msg: "Room is not yet started!",
+          data: null,
+        });
       }
     });
   });
+
+  /**
+   * @action //*CREATE_ROOM_SERVER
+   * @description Create the new room of the candidate
+   */
+  socket.on(
+    Events.CREATE_ROOM_SERVER,
+    ({ candidates, room_id, user_id, group_id }, callBack) => {
+      // 1 create the room_data
+      let Room = createNewRoom(room_id, group_id, candidates);
+      let candidates_list = [
+        ...candidates.map((cand) =>
+          createCandidate(room_id, cand, false, "", false)
+        ),
+        createCandidate(room_id, user_id, true, "", true),
+      ];
+
+      Room.candidates = candidates_list; // Add candidates to the list
+
+      // 2 join the current user to the room (socket)
+      // socket.join(room_id);
+
+      // 3 add data to redis
+      redisClient.setex(room_id, DEFAULT_EXPIRATION, JSON.stringify(Room));
+      //
+      logger.info("Room created");
+      return callBack({
+        error: false,
+        msg: "New room created",
+        data: Room,
+      });
+    }
+  );
+
+  /**
+   * @action //*GET_ROOM_INFO_SERVER
+   * @description Send the details of the room
+   */
+  socket.on(Events.GET_ROOM_INFO_SERVER, (room_id, callBack) => {
+    // 1 check if the room exists
+    redisClient.get(room_id, (error, room) => {
+      if (error) {
+        // Handle error
+        logger.error(error);
+        return callBack({
+          error: true,
+          msg: "Failed to get connect to room",
+          data: null,
+        });
+      }
+
+      // 2 check if the user is on the list
+      if (room !== null) {
+        let RoomData = JSON.parse(room); // get room
+
+        logger.info("ROOM DETAILS");
+        logger.info(RoomData);
+        return callBack({
+          error: false,
+          msg: "Room details",
+          data: RoomData,
+        });
+      } else {
+        logger.info("ROOM DETAILS");
+        return callBack({
+          error: true,
+          msg: "Room is not yet started!",
+          data: null,
+        });
+      }
+    });
+  });
+
+  //******** START EXAM ********/
+  socket.on(Events.START_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.START_EXAM_CLIENT, event);
+
+      //* Update db
+      updateRoomOptions(event.room_id, {
+        start_exam: true,
+        start_time: new Date().toString(),
+      });
+      logger.info("ROOM DONE EXAM");
+    }
+  });
+
+  //******** STOP EXAM ********/
+  socket.on(Events.STOP_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.STOP_EXAM_CLIENT, event);
+
+      //* Update db
+      updateRoomOptions(event.room_id, {
+        start_exam: false,
+        // start_time: new Date().toDateString(),
+        exam_done: true,
+      });
+      logger.info("ROOM STOP EXAM");
+    }
+  });
+
+  //******** STOP EXAM ********/
+  socket.on(Events.DELETE_ROOM_SERVER, (event, callbackFunction) => {
+    if (event.room_id) {
+      redisClient.del(event.room_id, function (err, response) {
+        if (response == 1) {
+          //  console.log("Deleted Successfully!");
+          logger.info(`DELETE ROOM: ${event.room_id}`);
+          callbackFunction(true);
+        } else {
+          //  console.log("Cannot delete")
+          logger.info(`CAN NOT DELETE THE ROOM`);
+          callbackFunction(false);
+        }
+      });
+    }
+  });
+
+  //******** CAND_WARNING_EXAM_SERVER EXAM ********/
+  socket.on(Events.CAND_WARNING_EXAM_SERVER, (event) => {
+    socket.to(event.room_id).emit(Events.CAND_WARNING_EXAM_CLIENT, event);
+  });
+
+  //******** CAND_EXAM_EVENT_SERVER EXAM ********/
+  socket.on(Events.CAND_EXAM_EVENT_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.CAND_EXAM_EVENT_CLIENT, event);
+
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        stopped: true,
+      });
+    }
+  });
+
+  //******** EXAM_DONE_SERVER EXAM ********/
+  socket.on(Events.EXAM_DONE_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.EXAM_DONE_CLIENT, event);
+
+      logger.info(`${event.user_id} DONE EXAM`);
+
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        done: true,
+        joined: true,
+      });
+    }
+  });
+
+  //******** CAND_CONTINUE_EXAM_SERVER EXAM ********/
+  socket.on(Events.CAND_CONTINUE_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.CAND_CONTINUE_EXAM_CLIENT, event);
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        stopped: false,
+      });
+      logger.info("CANDIDATE CONTINUE EXAM");
+    }
+  });
+
+  //******** CAND_STOP_EXAM_SERVER EXAM ********/
+  socket.on(Events.CAND_STOP_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.CAND_STOP_EXAM_CLIENT, event);
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        stopped: true,
+      });
+      logger.info("CANDIDATE STOP EXAM");
+    }
+  });
+
+  //******** CAND_STOP_EXAM_SERVER EXAM ********/
+  socket.on(Events.CAND_REMOVE_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.CAND_REMOVE_EXAM_CLIENT, event);
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        removed: true,
+      });
+      logger.info("CANDIDATE REMOVED INTO EXAM");
+    }
+  });
+
+  // //******** CAND_WARNING_EXAM_SERVER EXAM ********/
+  socket.on(Events.CAND_RESTART_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.CAND_RESTART_EXAM_CLIENT, event);
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        stopped: false,
+      });
+      logger.info("CANDIDATE EXAM RESTARTED EXAM");
+    }
+  });
+
+  //******** CAND_STOP_EXAM_SERVER EXAM ********/
+  socket.on(Events.CAND_DONE_EXAM_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.CAND_DONE_EXAM_CLIENT, event);
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        done: true,
+      });
+      logger.info("CANDIDATE DONE EXAM");
+    }
+  });
 });
 
-// server.listen(SERVER_PORT);
+// function getSetData(key, cb) {
+//   return new Promise((resolver, reject) => {
+//     redisClient.get(key, (error, data) => {
+//       if (error) return reject;
+//     });
+//   });
+// }
 
 server.listen(SERVER_PORT, () => {
-  // // console.log(`App listening at ${SERVER_URL}:${SERVER_PORT}`);
+  logger.info(`Socket Server is running on port ${SERVER_PORT}`);
 });
 // peerjs --port 3001
