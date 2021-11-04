@@ -4,7 +4,6 @@ let data_structure = {
     room_id: "",
     start_exam: false,
     start_time: "",
-    room_id: "",
     group_id: "",
     candidates: [
       {
@@ -16,6 +15,8 @@ let data_structure = {
         done: false,
         super: false,
         removed: false,
+        seat_number: 0,
+        duration: 0,
       },
     ],
   },
@@ -35,7 +36,8 @@ const createCandidate = (
   user_id,
   supervisor = false,
   peer_id = "",
-  active = false
+  active = false,
+  seat_number = 0
 ) => ({
   user_id: user_id,
   peer_id: peer_id,
@@ -46,6 +48,10 @@ const createCandidate = (
   done: false,
   removed: false,
   stopped: false,
+  seat_number: seat_number,
+  added_minutes: 0,
+  start_added_time: "",
+  duration: 0,
 });
 
 /**
@@ -62,7 +68,16 @@ const createNewRoom = (room_id, group_id, candidates = []) => ({
   group_id: group_id,
   candidates: candidates,
   exam_done: false,
+  duration: 0,
 });
+
+const Rules = {
+  right_click_enabled: true,
+  copy_enabled: true,
+  paste_enabled: true,
+  stop_candidate_when_comeback: true,
+  allow_to_leave_browser: true,
+};
 
 module.exports = {
   createCandidate,

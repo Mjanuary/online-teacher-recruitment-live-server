@@ -140,12 +140,30 @@ io.on("connection", (socket) => {
             joined: true,
           });
 
+          //! the changes goes here
+          let candidate_timer = {
+            start_time: "",
+            duration: 0,
+            minutes: userIsOnList.added_minutes,
+          };
+
+          // check if there is some added minutes
+          if (userIsOnList.added_minutes !== 0) {
+            candidate_timer.start_time = userIsOnList.start_added_time;
+            candidate_timer.duration = userIsOnList.duration;
+          } else {
+            candidate_timer.start_time = RoomData.start_time;
+            candidate_timer.duration = RoomData.duration;
+          }
+
           // Return the data with the callback
           return callBack({
             error: false,
             msg: "You joined the room successfully!",
+
             data: {
               ...RoomData,
+              candidate_timer: candidate_timer,
               user: { ...userIsOnList, active: true, joined: true },
             },
           });
@@ -165,8 +183,6 @@ io.on("connection", (socket) => {
     socket.on("disconnect", () => {
       socket.to(data.room_id).emit("user-disconnected", data.user_id);
       socket.leave(data.room_id);
-
-      console.log("Disconnected user");
 
       updateCandidateDetails(data.room_id, {
         user_id: data.user_id,
@@ -219,7 +235,7 @@ io.on("connection", (socket) => {
             ...RoomData,
             candidates: [
               ...RoomData.candidates,
-              createCandidate(user_id, room_id, "", true),
+              createCandidate(user_id, room_id, false, "", true, 0),
             ],
           };
           //* Add new user to the database
@@ -264,8 +280,8 @@ io.on("connection", (socket) => {
       // 1 create the room_data
       let Room = createNewRoom(room_id, group_id, candidates);
       let candidates_list = [
-        ...candidates.map((cand) =>
-          createCandidate(room_id, cand, false, "", false)
+        ...candidates.map((cand, seat_number) =>
+          createCandidate(room_id, cand, false, "", false, seat_number + 1)
         ),
         createCandidate(room_id, user_id, true, "", true),
       ];
@@ -327,16 +343,23 @@ io.on("connection", (socket) => {
   });
 
   //******** START EXAM ********/
-  socket.on(Events.START_EXAM_SERVER, (event) => {
+  socket.on(Events.START_EXAM_SERVER, (event, callBack) => {
     if (event.room_id) {
-      socket.to(event.room_id).emit(Events.START_EXAM_CLIENT, event);
+      let StartTime = new Date().toString();
+
+      socket.to(event.room_id).emit(Events.START_EXAM_CLIENT, event, {
+        start_time: StartTime,
+        duration: event.duration,
+      });
 
       //* Update db
       updateRoomOptions(event.room_id, {
         start_exam: true,
-        start_time: new Date().toString(),
+        start_time: StartTime,
+        duration: event.duration,
       });
       logger.info("ROOM DONE EXAM");
+      callBack({ start_time: StartTime, duration: event.duration });
     }
   });
 
@@ -360,11 +383,9 @@ io.on("connection", (socket) => {
     if (event.room_id) {
       redisClient.del(event.room_id, function (err, response) {
         if (response == 1) {
-          //  console.log("Deleted Successfully!");
           logger.info(`DELETE ROOM: ${event.room_id}`);
           callbackFunction(true);
         } else {
-          //  console.log("Cannot delete")
           logger.info(`CAN NOT DELETE THE ROOM`);
           callbackFunction(false);
         }
@@ -461,6 +482,43 @@ io.on("connection", (socket) => {
         done: true,
       });
       logger.info("CANDIDATE DONE EXAM");
+    }
+  });
+
+  //******** TIME_OUT_SERVER EXAM ********/
+  socket.on(Events.TIME_OUT_SERVER, (event) => {
+    if (event.room_id) {
+      socket.to(event.room_id).emit(Events.TIME_OUT_CLIENT, event);
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        stopped: true,
+      });
+      logger.info("CANDIDATE TIME_OUT EXAM");
+    }
+  });
+
+  //******** ADD_TIME_TO_CANDIDATE_SERVER EXAM ********/
+  socket.on(Events.ADD_TIME_TO_CANDIDATE_SERVER, (data_action, event) => {
+    if (event.room_id) {
+      const { minutes, duration, start_time } = data_action;
+
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        stopped: false,
+        start_added_time: start_time,
+        added_minutes: minutes,
+        duration: duration,
+      });
+
+      socket
+        .to(event.room_id)
+        .emit(
+          Events.ADD_TIME_TO_CANDIDATE_CLIENT,
+          { minutes, duration, start_time },
+          event
+        );
+
+      logger.info("ADD MINUTES TO CANDIDATE");
     }
   });
 });
