@@ -125,11 +125,13 @@ io.on("connection", (socket) => {
           //* User is on the list
           // 1 Join user to socket (Room)
           socket.join(room_id);
+          let candidate_blocked = RoomData.rule === true ? false : true;
 
           // 2 Send the JOIN event to the room
           socket.to(room_id).emit(Events.NEW_USER_JOINED_CLIENT, {
             ...userIsOnList,
             joined: true,
+            stopped: candidate_blocked,
           });
           logger.info(`${user_id} Joined the room: ${room_id}`);
 
@@ -138,6 +140,7 @@ io.on("connection", (socket) => {
             user_id: user_id,
             active: true,
             joined: true,
+            stopped: candidate_blocked,
           });
 
           //! the changes goes here
@@ -164,7 +167,12 @@ io.on("connection", (socket) => {
             data: {
               ...RoomData,
               candidate_timer: candidate_timer,
-              user: { ...userIsOnList, active: true, joined: true },
+              user: {
+                ...userIsOnList,
+                active: true,
+                joined: true,
+                stopped: candidate_blocked,
+              },
             },
           });
         }
@@ -276,9 +284,17 @@ io.on("connection", (socket) => {
    */
   socket.on(
     Events.CREATE_ROOM_SERVER,
-    ({ candidates, room_id, user_id, group_id }, callBack) => {
+    (
+      { candidates, room_id, user_id, group_id, stop_candidate_when_comeback },
+      callBack
+    ) => {
       // 1 create the room_data
-      let Room = createNewRoom(room_id, group_id, candidates);
+      let Room = createNewRoom(
+        room_id,
+        group_id,
+        candidates,
+        stop_candidate_when_comeback
+      );
       let candidates_list = [
         ...candidates.map((cand, seat_number) =>
           createCandidate(room_id, cand, false, "", false, seat_number + 1)

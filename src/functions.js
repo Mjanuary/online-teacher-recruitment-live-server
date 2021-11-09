@@ -61,7 +61,7 @@ const createCandidate = (
  * @param {*} candidates
  * @returns Object
  */
-const createNewRoom = (room_id, group_id, candidates = []) => ({
+const createNewRoom = (room_id, group_id, candidates = [], rule = false) => ({
   room_id: room_id,
   start_exam: false,
   start_time: null,
@@ -69,15 +69,16 @@ const createNewRoom = (room_id, group_id, candidates = []) => ({
   candidates: candidates,
   exam_done: false,
   duration: 0,
+  rule: rule, // stop_candidate_when_comeback
 });
 
-const Rules = {
-  right_click_enabled: true,
-  copy_enabled: true,
-  paste_enabled: true,
-  stop_candidate_when_comeback: true,
-  allow_to_leave_browser: true,
-};
+// const Rules = {
+//   right_click_enabled: true,
+//   copy_enabled: true,
+//   paste_enabled: true,
+//   stop_candidate_when_comeback: true,
+//   allow_to_leave_browser: true,
+// };
 
 module.exports = {
   createCandidate,
