@@ -7,7 +7,11 @@ const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
 const { createCandidate, createNewRoom } = require("./src/functions");
 
 // const client = Redis.createClient({url: ""})
-const redisClient = Redis.createClient();
+const redisClient = Redis.createClient({
+  port: 6379,
+  host: "localhost",
+  password: "xcoder",
+});
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
