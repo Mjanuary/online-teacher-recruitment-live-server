@@ -61,7 +61,13 @@ const createCandidate = (
  * @param {*} candidates
  * @returns Object
  */
-const createNewRoom = (room_id, group_id, candidates = [], rule = false) => ({
+const createNewRoom = (
+  room_id,
+  group_id,
+  candidates = [],
+  rule = false,
+  exam_id
+) => ({
   room_id: room_id,
   start_exam: false,
   start_time: null,
@@ -70,6 +76,7 @@ const createNewRoom = (room_id, group_id, candidates = [], rule = false) => ({
   exam_done: false,
   duration: 0,
   rule: rule, // stop_candidate_when_comeback
+  exam_id: exam_id,
 });
 
 // const Rules = {

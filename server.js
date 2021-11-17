@@ -10,7 +10,7 @@ const { createCandidate, createNewRoom } = require("./src/functions");
 const redisClient = Redis.createClient({
   port: 6379,
   host: "localhost",
-  password: "xcoder",
+  // password: "xcoder",
 });
 
 const app = express();
@@ -86,19 +86,7 @@ io.on("connection", (socket) => {
    * @description This will add the candidate to the room once they are on the attendance
    */
   socket.on("join-room", (data, callBack) => {
-    const { user_id, room_id, supper } = data;
-
-    // Add the supervisor to the room
-    if (supper !== undefined && supper === true) {
-      logger.info("SUPERVISOR JOINED THE ROOM");
-
-      socket.join(room_id);
-      return callBack({
-        error: false,
-        msg: "Joined the room",
-        data: { user_id, room_id, supper },
-      });
-    }
+    const { user_id, room_id, supper, exam_id } = data;
 
     // 1 check if the room exists
     redisClient.get(room_id, (error, room) => {
@@ -114,6 +102,27 @@ io.on("connection", (socket) => {
       // 2 check if the user is on the list
       if (room !== null) {
         let RoomData = JSON.parse(room); // get room
+        // check the exam_id
+        if (RoomData.exam_id !== exam_id) {
+          return callBack({
+            error: true,
+            msg: `Your exam does not match the current active exam in this room`,
+            data: null,
+          });
+        }
+
+        // Add the supervisor to the room
+        if (supper !== undefined && supper === true) {
+          logger.info("SUPERVISOR JOINED THE ROOM");
+
+          socket.join(room_id);
+          return callBack({
+            error: false,
+            msg: "Joined the room",
+            data: { user_id, room_id, supper },
+          });
+        }
+
         // check if the user exist on the room
         let userIsOnList = RoomData.candidates.find(
           (candid) => candid.user_id === user_id
@@ -289,7 +298,14 @@ io.on("connection", (socket) => {
   socket.on(
     Events.CREATE_ROOM_SERVER,
     (
-      { candidates, room_id, user_id, group_id, stop_candidate_when_comeback },
+      {
+        candidates,
+        room_id,
+        user_id,
+        group_id,
+        stop_candidate_when_comeback,
+        exam_id,
+      },
       callBack
     ) => {
       // 1 create the room_data
@@ -297,7 +313,8 @@ io.on("connection", (socket) => {
         room_id,
         group_id,
         candidates,
-        stop_candidate_when_comeback
+        stop_candidate_when_comeback,
+        exam_id
       );
       let candidates_list = [
         ...candidates.map((cand, seat_number) =>
