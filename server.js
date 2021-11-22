@@ -10,7 +10,7 @@ const { createCandidate, createNewRoom } = require("./src/functions");
 const redisClient = Redis.createClient({
   port: 6379,
   host: "localhost",
-  password: "xcoder",
+  // password: "xcoder",
 });
 
 const app = express();
@@ -138,7 +138,15 @@ io.on("connection", (socket) => {
           //* User is on the list
           // 1 Join user to socket (Room)
           socket.join(room_id);
-          let candidate_blocked = RoomData.rule === true ? false : true;
+
+          // RoomData
+          let candidate_blocked = false;
+          // Check if the candidate is logged in for the first time
+          if (userIsOnList.joined === false) {
+            candidate_blocked = false;
+          } else {
+            candidate_blocked = RoomData.rule === true ? false : true;
+          }
 
           // 2 Send the JOIN event to the room
           socket.to(room_id).emit(Events.NEW_USER_JOINED_CLIENT, {
