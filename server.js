@@ -10,7 +10,7 @@ const { createCandidate, createNewRoom } = require("./src/functions");
 const redisClient = Redis.createClient({
   port: 6379,
   host: "localhost",
-  // password: "xcoder",
+  password: "xcoder",
 });
 
 const app = express();
