@@ -66,7 +66,8 @@ const createNewRoom = (
   group_id,
   candidates = [],
   rule = false,
-  exam_id
+  exam_id,
+  duration = 0
 ) => ({
   room_id: room_id,
   start_exam: false,
@@ -74,7 +75,7 @@ const createNewRoom = (
   group_id: group_id,
   candidates: candidates,
   exam_done: false,
-  duration: 0,
+  duration: duration,
   rule: rule, // stop_candidate_when_comeback
   exam_id: exam_id,
 });

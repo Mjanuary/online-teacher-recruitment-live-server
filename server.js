@@ -313,6 +313,7 @@ io.on("connection", (socket) => {
         group_id,
         stop_candidate_when_comeback,
         exam_id,
+        duration,
       },
       callBack
     ) => {
@@ -322,7 +323,8 @@ io.on("connection", (socket) => {
         group_id,
         candidates,
         stop_candidate_when_comeback,
-        exam_id
+        exam_id,
+        duration
       );
       let candidates_list = [
         ...candidates.map((cand, seat_number) =>
