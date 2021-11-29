@@ -462,11 +462,24 @@ io.on("connection", (socket) => {
     if (event.room_id) {
       socket.to(event.room_id).emit(Events.EXAM_DONE_CLIENT, event);
 
-      logger.info(`${event.user_id} DONE EXAM`);
-
       updateCandidateDetails(event.room_id, {
         user_id: event.user_id,
         done: true,
+        joined: true,
+      });
+    }
+  });
+
+  //******** USER_DISCONNECTED_ONLINE_SERVER EXAM ********/
+  socket.on(Events.USER_DISCONNECTED_ONLINE_SERVER, (event) => {
+    if (event.room_id) {
+      // socket.to(event.room_id).emit(Events.USER_DISCONNECTED_ONLINE_CLIENT, event);
+      socket.to(event.room_id).emit("user-disconnected", event.user_id);
+      socket.leave(event.room_id);
+
+      updateCandidateDetails(event.room_id, {
+        user_id: event.user_id,
+        active: false,
         joined: true,
       });
     }
