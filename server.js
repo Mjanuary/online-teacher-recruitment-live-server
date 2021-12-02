@@ -392,7 +392,10 @@ io.on("connection", (socket) => {
   //******** START EXAM ********/
   socket.on(Events.START_EXAM_SERVER, (event, callBack) => {
     if (event.room_id) {
-      let StartTime = new Date().toString();
+      // let StartTime = new Date().toString();
+      let StartTime = new Date().toLocaleString("en-US", {
+        timeZone: "Africa/Kigali",
+      });
 
       socket.to(event.room_id).emit(Events.START_EXAM_CLIENT, event, {
         start_time: StartTime,
