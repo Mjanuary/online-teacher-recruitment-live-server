@@ -1,4 +1,5 @@
 const express = require("express");
+const moment = require("moment-timezone");
 const cors = require("cors");
 const Events = require("./src/events");
 const logger = require("./src/logger");
@@ -247,7 +248,7 @@ io.on("connection", (socket) => {
         let RoomData = JSON.parse(room); // get room
 
         // 1 Join user to socket (Room)
-        //// socket.join(room_id);
+        socket.join(room_id);
 
         // 2 Send the JOIN event to the room
         socket.to(room_id).emit(Events.NEW_USER_JOINED_CLIENT, userIsOnList);
@@ -393,9 +394,7 @@ io.on("connection", (socket) => {
   socket.on(Events.START_EXAM_SERVER, (event, callBack) => {
     if (event.room_id) {
       // let StartTime = new Date().toString();
-      let StartTime = new Date().toLocaleString("en-US", {
-        timeZone: "Africa/Kigali",
-      });
+      let StartTime = moment().tz("Africa/Kigali").toISOString();
 
       socket.to(event.room_id).emit(Events.START_EXAM_CLIENT, event, {
         start_time: StartTime,
@@ -585,14 +584,6 @@ io.on("connection", (socket) => {
     }
   });
 });
-
-// function getSetData(key, cb) {
-//   return new Promise((resolver, reject) => {
-//     redisClient.get(key, (error, data) => {
-//       if (error) return reject;
-//     });
-//   });
-// }
 
 server.listen(SERVER_PORT, () => {
   logger.info(`Socket Server is running on port ${SERVER_PORT}`);
