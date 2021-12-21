@@ -583,6 +583,14 @@ io.on("connection", (socket) => {
       logger.info("ADD MINUTES TO CANDIDATE");
     }
   });
+
+  socket.on(Events.DOCUMENT_VALIDATION_SERVER, (data) => {
+    socket.emit(Events.DOCUMENT_VALIDATION_CLIENT, data);
+  });
+
+  socket.on(Events.CLAIMING_CHANGE_SERVER, (data) => {
+    socket.emit(Events.CLAIMING_CHANGE_CLIENT, data);
+  });
 });
 
 server.listen(SERVER_PORT, () => {
