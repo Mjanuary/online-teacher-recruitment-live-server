@@ -4,8 +4,12 @@ const cors = require("cors");
 const Events = require("./src/events");
 const logger = require("./src/logger");
 const Redis = require("redis");
+const Axios = require("axios");
+
 const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
 const { createCandidate, createNewRoom } = require("./src/functions");
+const GET_EXAM_URL = "http://159.223.15.100/api/v1/exam/exampaper";
+// const GET_EXAM_URL = "http://localhost:4545";
 
 // const client = Redis.createClient({url: ""})
 const redisClient = Redis.createClient({
@@ -590,6 +594,43 @@ io.on("connection", (socket) => {
 
   socket.on(Events.CLAIMING_CHANGE_SERVER, (data) => {
     socket.emit(Events.CLAIMING_CHANGE_CLIENT, data);
+  });
+
+  socket.on(Events.REQUEST_EXAM_SERVER, (exam_id, sendExam) => {
+    // Check if exam exist in REDIS
+    let ExamData = null;
+
+    try {
+      redisClient.get(`EXAM-${exam_id}`, (error, examRedis) => {
+        let exam = JSON.parse(examRedis);
+        if (exam !== null) {
+          ExamData = JSON.parse(examRedis);
+          // console.log("yes redis have that");
+          return sendExam(true, JSON.parse(examRedis));
+        } else {
+          //* No Data found in redis
+
+          Axios.get(`${GET_EXAM_URL}/${exam_id}`)
+            .then((data) => {
+              ExamData = data.data;
+              // console.log("api");
+              if (ExamData === undefined) return sendExam(false, null);
+              sendExam(true, ExamData);
+              // Store exam
+              redisClient.setex(
+                `EXAM-${exam_id}`,
+                DEFAULT_EXPIRATION,
+                JSON.stringify(ExamData)
+              );
+            })
+            .catch((err) => {
+              sendExam(false, null);
+            });
+        }
+      });
+    } catch (error) {
+      return sendExam(false, "failed to send");
+    }
   });
 });
 
