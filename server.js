@@ -196,7 +196,6 @@ io.on("connection", (socket) => {
               user: {
                 ...userIsOnList,
                 active: true,
-                joined: true,
                 stopped: candidate_blocked,
               },
             },
