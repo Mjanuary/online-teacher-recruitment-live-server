@@ -9,7 +9,8 @@ const Axios = require("axios");
 const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
 const { createCandidate, createNewRoom } = require("./src/functions");
 const GET_EXAM_URL = "http://159.223.15.100/api/v1/exam/exampaper";
-// const GET_EXAM_URL = "http://localhost:4545";
+const SEND_ACTIVE_CANDIDATE_ON_START_EXAM =
+  "http://159.223.15.100/api/v1/exam/answersheet";
 
 // const client = Redis.createClient({url: ""})
 const redisClient = Redis.createClient({
@@ -76,6 +77,24 @@ const updateRoomOptions = (room_id, data) => {
 
 // Redis errors
 redisClient.on("error", (error) => logger.error(error));
+
+const sendCandidatesListAPI = (room_id) => {
+  redisClient.get(room_id, (error, room) => {
+    if (error) return;
+    if (room !== null) {
+      let newRoom = { ...JSON.parse(room) };
+
+      Axios.post(`${SEND_ACTIVE_CANDIDATE_ON_START_EXAM}/${newRoom.exam_id}`, {
+        users: newRoom.candidates.map((candid) => candid.user_id),
+        exam_location: {
+          district_id: newRoom.district_id,
+          center_id: newRoom.center_id,
+          room_id: room_id.room_id,
+        },
+      });
+    }
+  });
+};
 
 app.get("/live-server", (req, res) => {
   // redisClient.setex("photos", DEFAULT_EXPIRATION, JSON.stringify("data"));
@@ -318,6 +337,8 @@ io.on("connection", (socket) => {
         stop_candidate_when_comeback,
         exam_id,
         duration,
+        center_id,
+        district_id,
       },
       callBack
     ) => {
@@ -328,6 +349,8 @@ io.on("connection", (socket) => {
         candidates,
         stop_candidate_when_comeback,
         exam_id,
+        center_id,
+        district_id,
         duration
       );
       let candidates_list = [
@@ -410,7 +433,9 @@ io.on("connection", (socket) => {
         start_time: StartTime,
         duration: event.duration,
       });
-      logger.info("ROOM DONE EXAM");
+
+      sendCandidatesListAPI(null, event.room_id);
+      logger.info("ROOM START EXAM");
       callBack({ start_time: StartTime, duration: event.duration });
     }
   });

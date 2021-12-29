@@ -5,6 +5,8 @@ let data_structure = {
     start_exam: false,
     start_time: "",
     group_id: "",
+    center_id: "",
+    district_id: "",
     candidates: [
       {
         user_id: "",
@@ -67,6 +69,8 @@ const createNewRoom = (
   candidates = [],
   rule = false,
   exam_id,
+  center_id,
+  district_id,
   duration = 0
 ) => ({
   room_id: room_id,
@@ -78,6 +82,8 @@ const createNewRoom = (
   duration: duration,
   rule: rule, // stop_candidate_when_comeback
   exam_id: exam_id,
+  center_id: center_id,
+  district_id: district_id,
 });
 
 // const Rules = {
