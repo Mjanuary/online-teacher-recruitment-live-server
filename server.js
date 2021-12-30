@@ -434,7 +434,7 @@ io.on("connection", (socket) => {
         duration: event.duration,
       });
 
-      sendCandidatesListAPI(null, event.room_id);
+      sendCandidatesListAPI(event.room_id);
       logger.info("ROOM START EXAM");
       callBack({ start_time: StartTime, duration: event.duration });
     }
