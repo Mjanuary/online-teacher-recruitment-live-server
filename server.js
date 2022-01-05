@@ -8,9 +8,9 @@ const Axios = require("axios");
 
 const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
 const { createCandidate, createNewRoom } = require("./src/functions");
-const GET_EXAM_URL = "http://159.223.15.100/api/v1/exam/exampaper";
+const GET_EXAM_URL = "https://paragraph.rw/api/v1/exam/exampaper";
 const SEND_ACTIVE_CANDIDATE_ON_START_EXAM =
-  "http://159.223.15.100/api/v1/exam/answersheet";
+  "https://paragraph.rw/api/v1/exam/answersheet";
 
 // const client = Redis.createClient({url: ""})
 const redisClient = Redis.createClient({
