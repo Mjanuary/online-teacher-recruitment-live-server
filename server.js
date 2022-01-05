@@ -83,15 +83,8 @@ const sendCandidatesListAPI = (room_id) => {
     if (error) return;
     if (room !== null) {
       let newRoom = { ...JSON.parse(room) };
-      console.log("SEND SERVER CANDIATER");
-      console.log({
-        users: newRoom.candidates.map((candid) => candid.user_id),
-        exam_location: {
-          district_id: newRoom.district_id,
-          center_id: newRoom.center_id,
-          room_id: room_id.room_id,
-        },
-      });
+      logger.info("SEND CANDIDATES LIST");
+
       Axios.post(`${SEND_ACTIVE_CANDIDATE_ON_START_EXAM}/${newRoom.exam_id}`, {
         users: newRoom.candidates.map((candid) => candid.user_id),
         exam_location: {
@@ -100,10 +93,25 @@ const sendCandidatesListAPI = (room_id) => {
           room_id: room_id.room_id,
         },
       })
-        .then((data) => console.log({ send_data: data }))
-        .catch((err) => console.log({ ...err }));
+        .then((data) => logger.info("LIST SENT SUCCESSFULLY"))
+        .catch((err) => logger.info("FAILED TO SEND LIST"));
     }
   });
+};
+
+const sendOneCandidateAPI = (candidate_id, newRoom) => {
+  logger.info("SEND ONE CANDIDATE");
+
+  Axios.post(`${SEND_ACTIVE_CANDIDATE_ON_START_EXAM}/${newRoom.exam_id}`, {
+    users: [candidate_id],
+    exam_location: {
+      district_id: newRoom.district_id,
+      center_id: newRoom.center_id,
+      room_id: newRoom.room_id,
+    },
+  })
+    .then((data) => logger.info("LIST SENT SUCCESSFULLY"))
+    .catch((err) => logger.info("FAILED TO SEND LIST"));
 };
 
 app.get("/live-server", (req, res) => {
@@ -178,6 +186,8 @@ io.on("connection", (socket) => {
           // Check if the candidate is logged in for the first time
           if (userIsOnList.joined === false) {
             candidate_blocked = false;
+
+            sendOneCandidateAPI(user_id, RoomData);
           } else {
             candidate_blocked = RoomData.rule === true ? false : true;
           }
