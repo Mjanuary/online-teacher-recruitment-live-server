@@ -84,6 +84,14 @@ const sendCandidatesListAPI = (room_id) => {
     if (room !== null) {
       let newRoom = { ...JSON.parse(room) };
       console.log("SEND SERVER CANDIATER");
+      console.log({
+        users: newRoom.candidates.map((candid) => candid.user_id),
+        exam_location: {
+          district_id: newRoom.district_id,
+          center_id: newRoom.center_id,
+          room_id: room_id.room_id,
+        },
+      });
       Axios.post(`${SEND_ACTIVE_CANDIDATE_ON_START_EXAM}/${newRoom.exam_id}`, {
         users: newRoom.candidates.map((candid) => candid.user_id),
         exam_location: {
@@ -91,7 +99,9 @@ const sendCandidatesListAPI = (room_id) => {
           center_id: newRoom.center_id,
           room_id: room_id.room_id,
         },
-      }).then((data) => console.log({ send_data: data }));
+      })
+        .then((data) => console.log({ send_data: data }))
+        .catch((err) => console.log({ ...err }));
     }
   });
 };
