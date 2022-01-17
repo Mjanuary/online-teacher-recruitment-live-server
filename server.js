@@ -6,6 +6,8 @@ const logger = require("./src/logger");
 const Redis = require("redis");
 const Axios = require("axios");
 
+moment.tz.add("Kigali/Africa|PST PDT|80 70|0101|1Lzm0 1zb0 Op0");
+
 const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
 const { createCandidate, createNewRoom } = require("./src/functions");
 const GET_EXAM_URL = "https://paragraph.rw/api/v1/exam/exampaper";
