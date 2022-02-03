@@ -10,9 +10,9 @@ moment.tz.add("Kigali/Africa|PST PDT|80 70|0101|1Lzm0 1zb0 Op0");
 
 const { DEFAULT_EXPIRATION, SERVER_PORT, SERVER_URL } = require("./src/config");
 const { createCandidate, createNewRoom } = require("./src/functions");
-const GET_EXAM_URL = "http://143.198.191.168/api/v1/exam/exampaper";
+const GET_EXAM_URL = "https://paragraph.rw/api/v1/exam/exampaper";
 const SEND_ACTIVE_CANDIDATE_ON_START_EXAM =
-  "http://143.198.191.168/api/v1/exam/answersheet";
+  "https://paragraph.rw/api/v1/exam/answersheet";
 
 // const client = Redis.createClient({url: ""})
 const redisClient = Redis.createClient({
